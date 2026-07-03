@@ -1,0 +1,58 @@
+pipeline {
+  agent {
+    label 'AGENT-1'
+  }
+  options {
+    timeout(time: 30, unit: 'MINUTES') //timeout
+    disableConcurrentBuilds()  //disable concurent build one after one
+    ansiColor('xterm')
+  }
+  parameters {
+     choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Select Action')
+  }
+
+  stages {
+    stage('Init and Plan') {
+      steps {
+        withAWS(region: 'us-east-1', credentials: 'aws-creds') {
+          dir('infra-cicd/40-rds') {
+            sh """
+              terraform init -reconfigure
+              terraform plan -out=tfplan
+            """
+          }
+        }
+      }
+    }
+    stage('Apply and Destroy') {
+      steps {
+        withAWS(region: 'us-east-1', credentials: 'aws-creds') {
+          dir('infra-cicd/40-rds') {
+            sh """
+              if [ ${params.ACTION} == 'apply' ]
+              then 
+                terraform apply --auto-approve tfplan
+              elif [ ${params.ACTION} == 'destroy' ]
+              then 
+                terraform destroy --auto-approve 
+              fi
+            """
+          }
+        }
+      }
+    }
+  }
+
+  post {
+    always {
+      echo 'This section always runs!'
+      deleteDir() //in jenkins this function will delete the workspace directory of the job on the agent (VM/container)
+    }
+    success {
+      echo 'This section runs when pipeline sucess'
+    }
+    failure {
+      echo 'This section runs when pipeline failed' 
+    }
+  }
+}

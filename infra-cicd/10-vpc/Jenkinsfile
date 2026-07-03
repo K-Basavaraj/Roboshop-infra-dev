@@ -1,0 +1,68 @@
+pipeline {
+    agent {
+        label 'AGENT-1'
+    }
+    options {
+        timeout(time: 30, unit: 'MINUTES') //timeout
+        disableConcurrentBuilds()  //disable concurent build one after one
+        ansiColor('xterm')
+    }
+    parameters {
+        choice(name: 'ACTION', choices: ['apply', 'destroy'], description: 'Select Action')
+    }
+    stages {
+        stage('Init and Plan') {
+            steps {
+                withAWS(region: 'us-east-1', credentials: 'aws-creds') {
+                    dir('infra-cicd/10-vpc') {
+                      sh '''
+                        terraform init -reconfigure
+                        terraform plan -out=tfplan
+                      '''
+                    } 
+                }
+            }
+        }
+        stage('Apply and Destroy') {
+            steps {
+               withAWS(region: 'us-east-1', credentials: 'aws-creds') {
+                  dir('infra-cicd/10-vpc') { 
+                    sh """
+                        if [ ${params.ACTION} == 'apply' ]
+                        then
+                         terraform apply --auto-approve tfplan
+                        elif [ ${params.ACTION} == 'destroy' ]
+                        then
+                         terraform destroy --auto-approve
+                        fi
+                    """
+                  }
+                }
+            }
+        }
+        stage('Trigger SG') {
+            when {
+                expression { params.ACTION == 'apply' }
+            }
+            steps {
+                build job: '20-sg', parameters: [string(name: 'ACTION', value: 'apply')], wait: false
+                // Trigger downstream job '20-sg' from upstream job '10-vpc'.
+                // wait: true  → 10-vpc pauses until 20-sg completes, result depends on downstream.
+                // wait: false → 10-vpc continues immediately, 20-sg runs in parallel without blocking.
+            }
+        }
+    }
+
+    post {
+        always {
+            echo 'This section always runs!'
+            deleteDir() //in jenkins this function will delete the workspace directory of the job on the agent (VM/container)
+        }
+        success {
+            echo 'This section runs when pipeline sucess'
+        }
+        failure {
+            echo 'This section runs when pipeline failed'
+        }
+    }
+}
