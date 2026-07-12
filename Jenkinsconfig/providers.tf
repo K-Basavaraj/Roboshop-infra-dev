@@ -7,7 +7,7 @@ terraform {
   }
   backend "s3" {
     bucket       = "roboshop-infra-s3"
-    key          = "roboshop-jenkins-ci/cd/terraform.tfstate"
+    key          = "roboshop-jenkins-ci-cd/terraform.tfstate"
     region       = "us-east-1"
     encrypt      = true
     use_lockfile = true # New S3 native locking!
