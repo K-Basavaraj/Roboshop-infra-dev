@@ -50,9 +50,9 @@ module "eks" {
     #   key_name = aws_key_pair.eks.key_name
     # }
     green = {
-      min_size      = 2
+      min_size      = 3
       max_size      = 10
-      desired_size  = 2
+      desired_size  = 3
       capacity_type = "SPOT"
       iam_role_additional_policies = {
         AmazonEBSCSIDriverPolicy          = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
